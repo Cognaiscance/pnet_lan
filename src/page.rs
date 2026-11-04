@@ -244,7 +244,8 @@ pub fn form_fields(body: &str) -> Vec<(String, String)> {
 }
 
 /// One HTTP request against the shared list. `GET /` renders it. `POST /`
-/// saves it. Anything else is 404.
+/// saves it. A query string is ignored, so the portal iframe's `/?raw=1`
+/// is the same page. Anything else is 404.
 pub fn handle(
     method: &str,
     path: &str,
@@ -253,6 +254,7 @@ pub fn handle(
     dir: &Directory,
     now_ms: u64,
 ) -> (u16, String) {
+    let path = path.split_once('?').map(|(path, _)| path).unwrap_or(path);
     if path != "/" {
         return (404, "Not found".to_string());
     }
@@ -537,6 +539,9 @@ mod tests {
         assert_eq!(store.updated_at(), 0);
         let (status, _) = handle("GET", "/nope", "", &mut store, &directory, 80);
         assert_eq!(status, 404);
+        let (status, html) = handle("GET", "/?raw=1", "", &mut store, &directory, 80);
+        assert_eq!(status, 200);
+        assert!(html.contains("<h1>Addresses</h1>"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
