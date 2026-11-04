@@ -181,7 +181,7 @@ pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
         "</style></head><body>\n\
          <button class=\"theme-toggle\" type=\"button\">Light</button>\n\
          <main>\n<h1>Addresses</h1>\n\
-         <p class=\"lead\">One private address for each device. Leave a field blank to clear it.</p>\n\
+         <p class=\"lead\">A device with no address is disabled. Enable it to assign an address.</p>\n\
          <p class=\"lead\">Updated <time data-ms=\"",
     );
     body.push_str(&updated_at.to_string());
@@ -193,9 +193,8 @@ pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
         body.push_str(&escape(error));
         body.push_str("</p>\n");
     }
-    // An empty action posts back to this page, including when the portal
-    // serves it under /apps/lan/.
-    body.push_str("<form method=\"post\" action=\"\">\n");
+    // Each post goes back to this page, including when the portal serves it
+    // under /apps/lan/. A post names only the device being changed.
     let mut heading = None;
     for row in listed {
         if heading.as_deref() != Some(row.heading.as_str()) {
@@ -206,30 +205,85 @@ pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
             body.push_str(&escape(&row.heading));
             body.push_str(
                 "</h2>\n<section class=\"card\"><table><thead><tr>\
-                 <th>Device</th><th>Address</th></tr></thead><tbody>\n",
+                 <th>Device</th><th>Address</th><th></th></tr></thead><tbody>\n",
             );
             heading = Some(row.heading.clone());
         }
-        let value = row.address.map(|addr| addr.to_string()).unwrap_or_default();
         let id = hex_id(&row.device);
-        body.push_str("<tr><td><label for=\"");
-        body.push_str(&id);
-        body.push_str("\">");
-        body.push_str(&escape(&row.alias));
-        body.push_str("</label></td><td><input id=\"");
-        body.push_str(&id);
-        body.push_str("\" name=\"");
-        body.push_str(&id);
-        body.push_str("\" value=\"");
-        body.push_str(&escape(&value));
-        body.push_str("\" autocomplete=\"off\"></td></tr>\n");
+        let alias = escape(&row.alias);
+        body.push_str("<tr><td>");
+        body.push_str(&alias);
+        body.push_str("</td>");
+        match row.address {
+            None => {
+                body.push_str(
+                    "<td class=\"off\">Disabled</td><td class=\"actions\">\
+                     <button type=\"button\" class=\"enable\" data-device=\"",
+                );
+                body.push_str(&id);
+                body.push_str("\" data-alias=\"");
+                body.push_str(&alias);
+                body.push_str("\">Enable</button></td>");
+            }
+            Some(address) => {
+                let value = escape(&address.to_string());
+                body.push_str("<td class=\"addr\">");
+                body.push_str(&value);
+                body.push_str(
+                    "</td><td class=\"actions\">\
+                     <button type=\"button\" class=\"edit\" data-device=\"",
+                );
+                body.push_str(&id);
+                body.push_str("\" data-alias=\"");
+                body.push_str(&alias);
+                body.push_str("\" data-address=\"");
+                body.push_str(&value);
+                body.push_str(
+                    "\">Edit</button>\
+                     <form method=\"post\" action=\"\">\
+                     <input type=\"hidden\" name=\"",
+                );
+                body.push_str(&id);
+                body.push_str(
+                    "\" value=\"\">\
+                     <button class=\"ghost\" type=\"submit\">Disable</button></form></td>",
+                );
+            }
+        }
+        body.push_str("</tr>\n");
     }
     if heading.is_some() {
         body.push_str("</tbody></table></section></section>\n");
     }
     body.push_str(
-        "<button class=\"save\" type=\"submit\">Save</button></form>\n\
+        "<dialog id=\"address-dialog\">\
+         <form method=\"post\" action=\"\">\
+         <h2 id=\"dialog-title\">Address</h2>\
+         <label for=\"dialog-address\">Address</label>\
+         <input id=\"dialog-address\" name=\"\" value=\"\" autocomplete=\"off\" required>\
+         <div class=\"dialog-actions\">\
+         <button class=\"save\" type=\"submit\">Save</button>\
+         <button class=\"ghost\" type=\"button\" id=\"dialog-cancel\">Cancel</button>\
+         </div></form></dialog>\n\
          <p><a href=\"/\">Portal home</a></p>\n</main>\n<script>\
+         (function () {\
+           var dialog = document.getElementById(\"address-dialog\");\
+           var title = document.getElementById(\"dialog-title\");\
+           var input = document.getElementById(\"dialog-address\");\
+           var cancel = document.getElementById(\"dialog-cancel\");\
+           document.addEventListener(\"click\", function (ev) {\
+             var btn = ev.target.closest && ev.target.closest(\"button.enable, button.edit\");\
+             if (!btn || !dialog || !input) return;\
+             var alias = btn.getAttribute(\"data-alias\") || \"device\";\
+             var enabling = btn.classList.contains(\"enable\");\
+             if (title) title.textContent = (enabling ? \"Enable \" : \"Edit \") + alias;\
+             input.name = btn.getAttribute(\"data-device\") || \"\";\
+             input.value = btn.getAttribute(\"data-address\") || \"\";\
+             if (dialog.showModal) dialog.showModal();\
+             input.focus();\
+           });\
+           if (cancel && dialog) cancel.addEventListener(\"click\", function () { dialog.close(); });\
+         })();\
          (function () {\
            var key = \"pnet-theme\";\
            function current() {\
@@ -317,23 +371,32 @@ main { max-width: 56rem; margin: 0 auto; padding: 2rem 1.2rem 3rem; }
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
 th { color: var(--muted); font-weight: 600; font-size: .85rem; }
-label { font-weight: 600; }
+.off { color: var(--muted); }
+.addr { font-variant-numeric: tabular-nums; }
+td.actions { text-align: right; white-space: nowrap; }
+td.actions form { display: inline; }
 input {
-  background: var(--bg); color: var(--ink); border: 1px solid var(--line-strong);
-  border-radius: 8px; padding: .4rem .65rem; width: 16rem; max-width: 100%; font: inherit;
+  display: block; background: var(--bg); color: var(--ink); border: 1px solid var(--line-strong);
+  border-radius: 8px; padding: .45rem .65rem; width: 100%; margin: .4rem 0 .8rem; font: inherit;
 }
 input:focus { outline: 2px solid var(--gold); border-color: var(--gold); }
-button.theme-toggle {
-  position: fixed; top: 1rem; right: 1rem; z-index: 2;
+button {
   background: transparent; color: var(--ink); border: 1px solid var(--line-strong);
   border-radius: 8px; font-weight: 600; padding: .28rem .7rem; cursor: pointer;
 }
-button.theme-toggle:hover { color: var(--gold); border-color: var(--gold); }
+button:hover { color: var(--gold); border-color: var(--gold); }
+button.theme-toggle { position: fixed; top: 1rem; right: 1rem; z-index: 2; }
 button.save {
-  background: var(--gold); color: var(--gold-ink); border: 0; border-radius: 8px;
-  font-weight: 600; padding: .5rem 1.1rem; cursor: pointer; margin-top: .4rem;
+  background: var(--gold); color: var(--gold-ink); border: 0;
 }
-button.save:hover { background: var(--gold-hover); }
+button.save:hover { background: var(--gold-hover); color: var(--gold-ink); }
+dialog {
+  background: var(--bg-elev); color: var(--ink); border: 1px solid var(--card-line);
+  border-radius: 14px; box-shadow: var(--shadow); padding: 1.2rem 1.4rem; width: min(24rem, 92vw);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+dialog h2 { margin: 0 0 .8rem; font-size: 1.35rem; }
+.dialog-actions { display: flex; gap: .5rem; justify-content: flex-end; }
 "#;
 
 /// Apply a saved form. A bad address writes nothing. An unknown device is
@@ -630,6 +693,11 @@ mod tests {
         let phone = html.find("phone").unwrap();
         assert!(own < laptop && laptop < chad && chad < phone);
         assert!(html.contains("10.0.0.2"));
+        assert!(html.contains(">Edit<"));
+        assert!(html.contains(">Disable<"));
+        assert!(html.contains(">Enable<"));
+        assert!(html.contains("Disabled"));
+        assert!(html.contains("address-dialog"));
         assert!(html.contains("action=\"\""));
         assert!(html.contains("pnet-theme"));
         assert!(html.contains("data-theme=\"dark\""));
