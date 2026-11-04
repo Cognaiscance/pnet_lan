@@ -160,40 +160,181 @@ fn stored(store: &Store, device: &[u8; 16]) -> Option<IpAddr> {
 }
 
 pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
-    let mut body = String::new();
-    body.push_str(
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>pNet LAN</title></head><body>",
+    let mut body = String::from(
+        "<!DOCTYPE html>\n<html lang=\"en\" data-theme=\"dark\"><head><meta charset=\"utf-8\">\
+         <meta name=\"theme-color\" content=\"#070605\"><title>pNet LAN</title>\n\
+         <script>\
+         (function () {\
+           var theme = \"dark\";\
+           try {\
+             var saved = localStorage.getItem(\"pnet-theme\");\
+             if (saved === \"light\" || saved === \"dark\") theme = saved;\
+           } catch (e) {}\
+           document.documentElement.setAttribute(\"data-theme\", theme);\
+           var meta = document.querySelector('meta[name=\"theme-color\"]');\
+           if (meta) meta.setAttribute(\"content\", theme === \"light\" ? \"#f3eee4\" : \"#070605\");\
+         })();\
+         </script>\n<style>",
     );
-    body.push_str("<h1>Addresses</h1>");
-    body.push_str(&format!("<p>Updated at {updated_at}.</p>"));
+    body.push_str(PAGE_CSS);
+    body.push_str(
+        "</style></head><body>\n\
+         <button class=\"theme-toggle\" type=\"button\">Light</button>\n\
+         <main>\n<h1>Addresses</h1>\n\
+         <p class=\"lead\">One private address for each device. Leave a field blank to clear it.</p>\n\
+         <p class=\"lead\">Updated <time data-ms=\"",
+    );
+    body.push_str(&updated_at.to_string());
+    body.push_str("\">");
+    body.push_str(&updated_at.to_string());
+    body.push_str("</time>.</p>\n");
     if let Some(error) = error {
-        body.push_str("<p>");
+        body.push_str("<p class=\"error\">");
         body.push_str(&escape(error));
-        body.push_str("</p>");
+        body.push_str("</p>\n");
     }
     // An empty action posts back to this page, including when the portal
     // serves it under /apps/lan/.
-    body.push_str("<form method=\"post\" action=\"\">");
+    body.push_str("<form method=\"post\" action=\"\">\n");
     let mut heading = None;
     for row in listed {
         if heading.as_deref() != Some(row.heading.as_str()) {
-            body.push_str("<h2>");
+            if heading.is_some() {
+                body.push_str("</tbody></table></section></section>\n");
+            }
+            body.push_str("<section class=\"person\"><h2>");
             body.push_str(&escape(&row.heading));
-            body.push_str("</h2>");
+            body.push_str(
+                "</h2>\n<section class=\"card\"><table><thead><tr>\
+                 <th>Device</th><th>Address</th></tr></thead><tbody>\n",
+            );
             heading = Some(row.heading.clone());
         }
         let value = row.address.map(|addr| addr.to_string()).unwrap_or_default();
-        body.push_str("<label>");
+        let id = hex_id(&row.device);
+        body.push_str("<tr><td><label for=\"");
+        body.push_str(&id);
+        body.push_str("\">");
         body.push_str(&escape(&row.alias));
-        body.push_str(" <input name=\"");
-        body.push_str(&hex_id(&row.device));
+        body.push_str("</label></td><td><input id=\"");
+        body.push_str(&id);
+        body.push_str("\" name=\"");
+        body.push_str(&id);
         body.push_str("\" value=\"");
         body.push_str(&escape(&value));
-        body.push_str("\"></label><br>");
+        body.push_str("\" autocomplete=\"off\"></td></tr>\n");
     }
-    body.push_str("<button type=\"submit\">Save</button></form></body></html>");
+    if heading.is_some() {
+        body.push_str("</tbody></table></section></section>\n");
+    }
+    body.push_str(
+        "<button class=\"save\" type=\"submit\">Save</button></form>\n\
+         <p><a href=\"/\">Portal home</a></p>\n</main>\n<script>\
+         (function () {\
+           var key = \"pnet-theme\";\
+           function current() {\
+             return document.documentElement.getAttribute(\"data-theme\") === \"light\" ? \"light\" : \"dark\";\
+           }\
+           function paint(theme) {\
+             document.documentElement.setAttribute(\"data-theme\", theme);\
+             var meta = document.querySelector('meta[name=\"theme-color\"]');\
+             if (meta) meta.setAttribute(\"content\", theme === \"light\" ? \"#f3eee4\" : \"#070605\");\
+             var next = theme === \"dark\" ? \"light\" : \"dark\";\
+             document.querySelectorAll(\".theme-toggle\").forEach(function (btn) {\
+               btn.textContent = theme === \"dark\" ? \"Light\" : \"Dark\";\
+               btn.setAttribute(\"aria-label\", \"Switch to \" + next + \" mode\");\
+             });\
+           }\
+           paint(current());\
+           document.addEventListener(\"click\", function (ev) {\
+             var btn = ev.target.closest && ev.target.closest(\".theme-toggle\");\
+             if (!btn) return;\
+             var next = current() === \"dark\" ? \"light\" : \"dark\";\
+             try { localStorage.setItem(key, next); } catch (e) {}\
+             paint(next);\
+           });\
+           window.addEventListener(\"storage\", function (ev) {\
+             if (ev.key === key && (ev.newValue === \"light\" || ev.newValue === \"dark\")) paint(ev.newValue);\
+           });\
+         })();\
+         (function () {\
+           var fmt = new Intl.DateTimeFormat(undefined, {\
+             year: \"numeric\", month: \"2-digit\", day: \"2-digit\",\
+             hour: \"2-digit\", minute: \"2-digit\", second: \"2-digit\",\
+             hourCycle: \"h23\", timeZoneName: \"short\"\
+           });\
+           document.querySelectorAll(\"time[data-ms]\").forEach(function (el) {\
+             var ms = Number(el.getAttribute(\"data-ms\"));\
+             if (!Number.isFinite(ms)) return;\
+             el.textContent = fmt.format(new Date(ms));\
+           });\
+         })();\
+         </script>\n</body></html>\n",
+    );
     body
 }
+
+const PAGE_CSS: &str = r#"
+:root, html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #070605; --bg-glow: #2a2218; --bg-elev: #14110d;
+  --ink: #f4efe6; --muted: #b7aa96; --gold: #d4b15a; --gold-hover: #e4c56e;
+  --gold-ink: #1a1408; --line: rgba(244, 239, 230, 0.12);
+  --card-line: rgba(212, 177, 90, 0.32); --line-strong: rgba(212, 177, 90, 0.45);
+  --shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  --bad: #e07a6a; --link: #e4c97a;
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f3eee4; --bg-glow: #f0e0be; --bg-elev: #fffdf8;
+  --ink: #241c14; --muted: #6b5844; --gold: #8d6818; --gold-hover: #6f5010;
+  --gold-ink: #fffdf8; --line: rgba(36, 28, 20, 0.1);
+  --card-line: rgba(141, 104, 24, 0.28); --line-strong: rgba(141, 104, 24, 0.38);
+  --shadow: 0 12px 32px rgba(70, 48, 16, 0.08);
+  --bad: #a3261c; --link: #8a6412;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: radial-gradient(1100px 520px at 50% -12%, var(--bg-glow) 0%, transparent 58%), var(--bg);
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+}
+h1, h2 { font-family: Georgia, "Iowan Old Style", Palatino, serif; font-weight: 600; }
+h1 { margin: 0 0 0.4rem; font-size: 1.9rem; }
+.person { margin: 1.6rem 0 0.2rem; }
+.person > h2 { margin: 0; font-size: 1.45rem; }
+a { color: var(--link); }
+a:hover { color: var(--gold-hover); }
+main { max-width: 56rem; margin: 0 auto; padding: 2rem 1.2rem 3rem; }
+.lead { color: var(--muted); }
+.error { color: var(--bad); font-weight: 600; }
+.card {
+  background: var(--bg-elev); border: 1px solid var(--card-line); border-radius: 14px;
+  padding: 1.2rem 1.4rem; box-shadow: var(--shadow); margin: 1rem 0;
+}
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+label { font-weight: 600; }
+input {
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line-strong);
+  border-radius: 8px; padding: .4rem .65rem; width: 16rem; max-width: 100%; font: inherit;
+}
+input:focus { outline: 2px solid var(--gold); border-color: var(--gold); }
+button.theme-toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 2;
+  background: transparent; color: var(--ink); border: 1px solid var(--line-strong);
+  border-radius: 8px; font-weight: 600; padding: .28rem .7rem; cursor: pointer;
+}
+button.theme-toggle:hover { color: var(--gold); border-color: var(--gold); }
+button.save {
+  background: var(--gold); color: var(--gold-ink); border: 0; border-radius: 8px;
+  font-weight: 600; padding: .5rem 1.1rem; cursor: pointer; margin-top: .4rem;
+}
+button.save:hover { background: var(--gold-hover); }
+"#;
 
 /// Apply a saved form. A bad address writes nothing. An unknown device is
 /// ignored. An empty field clears a stored address.
@@ -490,6 +631,9 @@ mod tests {
         assert!(own < laptop && laptop < chad && chad < phone);
         assert!(html.contains("10.0.0.2"));
         assert!(html.contains("action=\"\""));
+        assert!(html.contains("pnet-theme"));
+        assert!(html.contains("data-theme=\"dark\""));
+        assert!(html.contains("theme-toggle"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
