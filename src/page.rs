@@ -265,7 +265,7 @@ pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
          <button class=\"save\" type=\"submit\">Save</button>\
          <button class=\"ghost\" type=\"button\" id=\"dialog-cancel\">Cancel</button>\
          </div></form></dialog>\n\
-         <p><a href=\"/\">Portal home</a></p>\n</main>\n<script>\
+         </main>\n<script>\
          (function () {\
            var dialog = document.getElementById(\"address-dialog\");\
            var title = document.getElementById(\"dialog-title\");\
@@ -336,7 +336,7 @@ const PAGE_CSS: &str = r#"
   --gold-ink: #1a1408; --line: rgba(244, 239, 230, 0.12);
   --card-line: rgba(212, 177, 90, 0.32); --line-strong: rgba(212, 177, 90, 0.45);
   --shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
-  --bad: #e07a6a; --link: #e4c97a;
+  --bad: #e07a6a;
 }
 html[data-theme="light"] {
   color-scheme: light;
@@ -345,7 +345,7 @@ html[data-theme="light"] {
   --gold-ink: #fffdf8; --line: rgba(36, 28, 20, 0.1);
   --card-line: rgba(141, 104, 24, 0.28); --line-strong: rgba(141, 104, 24, 0.38);
   --shadow: 0 12px 32px rgba(70, 48, 16, 0.08);
-  --bad: #a3261c; --link: #8a6412;
+  --bad: #a3261c;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
@@ -359,8 +359,6 @@ h1, h2 { font-family: Georgia, "Iowan Old Style", Palatino, serif; font-weight: 
 h1 { margin: 0 0 0.4rem; font-size: 1.9rem; }
 .person { margin: 1.6rem 0 0.2rem; }
 .person > h2 { margin: 0; font-size: 1.45rem; }
-a { color: var(--link); }
-a:hover { color: var(--gold-hover); }
 main { max-width: 56rem; margin: 0 auto; padding: 2rem 1.2rem 3rem; }
 .lead { color: var(--muted); }
 .error { color: var(--bad); font-weight: 600; }
@@ -702,6 +700,7 @@ mod tests {
         assert!(html.contains("pnet-theme"));
         assert!(html.contains("data-theme=\"dark\""));
         assert!(html.contains("theme-toggle"));
+        assert!(!html.contains("Portal home"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
