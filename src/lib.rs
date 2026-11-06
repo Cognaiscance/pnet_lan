@@ -4,6 +4,7 @@
 //! this library, register under those names, and use protocol
 //! `application/pnet-lan`.
 
+mod log_setup;
 mod directory;
 mod fetch;
 mod forward;

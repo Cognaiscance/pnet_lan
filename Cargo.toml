@@ -5,6 +5,8 @@ edition = "2021"
 description = "A private IP overlay over pNet. The client and the server register as different apps."
 
 [dependencies]
+log = "0.4"
+flexi_logger = "0.31"
 
 [lib]
 name = "pnet_lan"

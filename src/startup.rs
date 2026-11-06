@@ -26,10 +26,11 @@ use crate::store::{self, Store};
 use crate::tun::{self, claim_for};
 
 pub fn main_for(kind: ProcessKind) -> ExitCode {
+    crate::log_setup::init(kind.alias());
     match run(kind) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            eprintln!("{}: {err}", kind.alias());
+            log::error!("{}: {err}", kind.alias());
             ExitCode::FAILURE
         }
     }
@@ -47,7 +48,7 @@ fn run(kind: ProcessKind) -> Result<(), String> {
     let client =
         NodeClient::connect(pnet_addr).map_err(|err| format!("connect to {pnet_addr}: {err}"))?;
 
-    eprintln!("{name}: registering with {pnet_addr}");
+    log::error!("{name}: registering with {pnet_addr}");
     let token = match client.register(name, push_port) {
         Ok(token) => {
             save_token(&token_path, &token).map_err(|err| format!("save token: {err}"))?;
@@ -55,7 +56,7 @@ fn run(kind: ProcessKind) -> Result<(), String> {
         }
         Err(err) => match load_token(&token_path) {
             Ok(Some(token)) => {
-                eprintln!("{name}: register failed ({err}); using the saved token");
+                log::error!("{name}: register failed ({err}); using the saved token");
                 token
             }
             Ok(None) => return Err(format!("register failed: {err}")),
@@ -77,24 +78,24 @@ fn run(kind: ProcessKind) -> Result<(), String> {
     }
     let role = choose_role(&dir, kind).map_err(|err| err.to_string())?;
 
-    println!("{name}: {role}");
-    println!("{}", role_summary(role));
+    log::info!("{name}: {role}");
+    log::info!("{}", role_summary(role));
     if !dir.local_app_approved {
-        println!("The local node has not approved this app yet.");
+        log::info!("The local node has not approved this app yet.");
     }
-    println!(
+    log::info!(
         "token {}… at {}",
         token_prefix(&token),
         token_path.display()
     );
-    println!("Push port {push_port}. Stop with Ctrl-C.");
+    log::info!("Push port {push_port}. Stop with Ctrl-C.");
     let _ = std::io::Write::flush(&mut std::io::stdout());
     if role.opens_store() {
         let path = store::record_dir();
         let mut list = Store::open(&path).map_err(|err| format!("open address list: {err}"))?;
         list.note_clients_from(&dir)
             .map_err(|err| format!("note clients: {err}"))?;
-        println!(
+        log::info!(
             "Address list {} ({} devices, updated_at {}).",
             path.display(),
             list.assignments().len(),
@@ -105,16 +106,16 @@ fn run(kind: ProcessKind) -> Result<(), String> {
         let http_port = page::http_port()?;
         let listener = std::net::TcpListener::bind(("127.0.0.1", http_port))
             .map_err(|err| format!("bind 127.0.0.1:{http_port}: {err}"))?;
-        println!("Address page http://127.0.0.1:{http_port}/");
+        log::info!("Address page http://127.0.0.1:{http_port}/");
         match page::register_portal(http_port) {
             Ok(line) => println!("{line}"),
-            Err(err) => eprintln!("portal mount: {err}"),
+            Err(err) => log::error!("portal mount: {err}"),
         }
         let page_list = Arc::clone(&list);
         let page_dir = Arc::clone(&shared_dir);
         std::thread::spawn(move || {
             if let Err(err) = page::serve(listener, page_list, page_dir) {
-                eprintln!("address page: {err}");
+                log::error!("address page: {err}");
             }
         });
         serve_record(&client, &push, &token, &list, &shared_dir)?;
@@ -128,12 +129,12 @@ fn run(kind: ProcessKind) -> Result<(), String> {
 
 fn request_list(client: &NodeClient, token: &[u8; 16], dir: &crate::directory::Directory) {
     let Some((device, app)) = record_server(dir) else {
-        println!("The rank-1 server is not running pnet-lan-server yet.");
+        log::info!("The rank-1 server is not running pnet-lan-server yet.");
         return;
     };
     match client.send(token, &device, &app, &fetch_request()) {
-        Ok(()) => println!("Asked the server for the address list."),
-        Err(err) => println!("Could not ask for the address list: {err}"),
+        Ok(()) => log::info!("Asked the server for the address list."),
+        Err(err) => log::info!("Could not ask for the address list: {err}"),
     }
 }
 
@@ -145,7 +146,7 @@ fn serve_client(
 ) -> Result<(), String> {
     let interface =
         Arc::new(tun::Tun::open("pnetlan").map_err(|err| format!("open tun pnetlan: {err}"))?);
-    println!("TUN {} is open (fd {}).", interface.name, interface.fd());
+    log::info!("TUN {} is open (fd {}).", interface.name, interface.fd());
     let client = Arc::new(client);
     let rows = Arc::new(Mutex::new(Vec::new()));
     let directory = Arc::new(Mutex::new(dir.clone()));
@@ -182,7 +183,7 @@ fn serve_client(
             if let Some(device) = device_of_client(&current, &sender) {
                 if let Some(rewritten) = prepare_inbound(payload, &local_device, &device, &saved) {
                     if let Err(err) = interface.write_packet(&rewritten) {
-                        eprintln!("could not write the packet: {err}");
+                        log::error!("could not write the packet: {err}");
                     }
                 }
             }
@@ -192,7 +193,7 @@ fn serve_client(
             let claim = claim_for(&dir.local_device, &list);
             tun::apply(&interface.name, &claim)?;
             *saved = list;
-            println!("{}", tun::describe(&claim));
+            log::info!("{}", tun::describe(&claim));
         }
         drop(saved);
         drop(current);
@@ -203,9 +204,9 @@ fn serve_client(
             continue;
         };
         if let Err(err) = client.send(token, &device, &app, &ack_message(updated_at)) {
-            eprintln!("could not confirm the address list: {err}");
+            log::error!("could not confirm the address list: {err}");
         } else {
-            println!("Confirmed address list {updated_at}.");
+            log::info!("Confirmed address list {updated_at}.");
         }
     }
 }
@@ -224,7 +225,7 @@ fn forward_outbound(
             Ok(0) => return,
             Ok(n) => n,
             Err(err) => {
-                eprintln!("tun read: {err}");
+                log::error!("tun read: {err}");
                 return;
             }
         };
@@ -244,7 +245,7 @@ fn forward_outbound(
             continue;
         };
         if let Err(err) = client.send(&token, &device, &app, &payload) {
-            eprintln!("could not forward the packet: {err}");
+            log::error!("could not forward the packet: {err}");
         }
     }
 }
@@ -289,7 +290,7 @@ fn serve_record(
                     continue;
                 }
                 if let Err(err) = client.send(token, &device, &app, &message) {
-                    eprintln!("could not push the address list: {err}");
+                    log::error!("could not push the address list: {err}");
                 }
             }
         }
@@ -324,7 +325,7 @@ fn serve_record(
             continue;
         };
         if let Err(err) = client.send(token, &device, &sender, &reply) {
-            eprintln!("could not send the address list: {err}");
+            log::error!("could not send the address list: {err}");
         }
     }
 }
