@@ -108,7 +108,7 @@ fn run(kind: ProcessKind) -> Result<(), String> {
             .map_err(|err| format!("bind 127.0.0.1:{http_port}: {err}"))?;
         log::info!("Address page http://127.0.0.1:{http_port}/");
         match page::register_portal(http_port) {
-            Ok(line) => println!("{line}"),
+            Ok(line) => log::info!("{line}"),
             Err(err) => log::error!("portal mount: {err}"),
         }
         let page_list = Arc::clone(&list);
