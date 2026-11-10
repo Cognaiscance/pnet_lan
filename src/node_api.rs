@@ -240,6 +240,8 @@ fn read_send_result(socket: &UdpSocket) -> Result<(), NodeError> {
             if n >= 1 && buf[0] == STATUS_ERR {
                 let code = if n >= 2 { Some(buf[1]) } else { None };
                 Err(NodeError::Rejected { code })
+            } else if n >= 1 && buf[0] == STATUS_OK {
+                Ok(())
             } else {
                 Err(NodeError::Unexpected)
             }
