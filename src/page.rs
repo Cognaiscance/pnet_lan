@@ -16,7 +16,7 @@ use crate::store::{Store, StoreError};
 pub const DEFAULT_HTTP_PORT: u16 = 8794;
 
 pub const PORTAL_SLUG: &str = "lan";
-pub const PORTAL_TITLE: &str = "pNet LAN";
+pub const PORTAL_TITLE: &str = "LAN";
 
 pub fn portal_base() -> String {
     match std::env::var("PNET_PORTAL") {
@@ -162,7 +162,7 @@ fn stored(store: &Store, device: &[u8; 16]) -> Option<IpAddr> {
 pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
     let mut body = String::from(
         "<!DOCTYPE html>\n<html lang=\"en\" data-theme=\"dark\"><head><meta charset=\"utf-8\">\
-         <meta name=\"theme-color\" content=\"#070605\"><title>pNet LAN</title>\n\
+         <meta name=\"theme-color\" content=\"#070605\"><title>LAN</title>\n\
          <script>\
          (function () {\
            var theme = \"dark\";\
