@@ -179,7 +179,6 @@ pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
     body.push_str(PAGE_CSS);
     body.push_str(
         "</style></head><body>\n\
-         <button class=\"theme-toggle\" type=\"button\">Light</button>\n\
          <main>\n<h1>Addresses</h1>\n\
          <p class=\"lead\">A device with no address is disabled. Enable it to assign an address.</p>\n\
          <p class=\"lead\">Updated <time data-ms=\"",
@@ -286,27 +285,11 @@ pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
          })();\
          (function () {\
            var key = \"pnet-theme\";\
-           function current() {\
-             return document.documentElement.getAttribute(\"data-theme\") === \"light\" ? \"light\" : \"dark\";\
-           }\
            function paint(theme) {\
              document.documentElement.setAttribute(\"data-theme\", theme);\
              var meta = document.querySelector('meta[name=\"theme-color\"]');\
              if (meta) meta.setAttribute(\"content\", theme === \"light\" ? \"#f3eee4\" : \"#070605\");\
-             var next = theme === \"dark\" ? \"light\" : \"dark\";\
-             document.querySelectorAll(\".theme-toggle\").forEach(function (btn) {\
-               btn.textContent = theme === \"dark\" ? \"Light\" : \"Dark\";\
-               btn.setAttribute(\"aria-label\", \"Switch to \" + next + \" mode\");\
-             });\
            }\
-           paint(current());\
-           document.addEventListener(\"click\", function (ev) {\
-             var btn = ev.target.closest && ev.target.closest(\".theme-toggle\");\
-             if (!btn) return;\
-             var next = current() === \"dark\" ? \"light\" : \"dark\";\
-             try { localStorage.setItem(key, next); } catch (e) {}\
-             paint(next);\
-           });\
            window.addEventListener(\"storage\", function (ev) {\
              if (ev.key === key && (ev.newValue === \"light\" || ev.newValue === \"dark\")) paint(ev.newValue);\
            });\
@@ -383,7 +366,6 @@ button {
   border-radius: 8px; font-weight: 600; padding: .28rem .7rem; cursor: pointer;
 }
 button:hover { color: var(--gold); border-color: var(--gold); }
-button.theme-toggle { position: fixed; top: 1rem; right: 1rem; z-index: 2; }
 button.save {
   background: var(--gold); color: var(--gold-ink); border: 0;
 }
@@ -699,7 +681,8 @@ mod tests {
         assert!(html.contains("action=\"\""));
         assert!(html.contains("pnet-theme"));
         assert!(html.contains("data-theme=\"dark\""));
-        assert!(html.contains("theme-toggle"));
+        assert!(html.contains("html[data-theme=\"light\"]"));
+        assert!(!html.contains("theme-toggle"));
         assert!(!html.contains("Portal home"));
         let _ = std::fs::remove_dir_all(&dir);
     }
