@@ -159,7 +159,7 @@ fn stored(store: &Store, device: &[u8; 16]) -> Option<IpAddr> {
         .and_then(|row| row.address)
 }
 
-pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
+pub fn render(_updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
     let mut body = String::from(
         "<!DOCTYPE html>\n<html lang=\"en\" data-theme=\"dark\"><head><meta charset=\"utf-8\">\
          <meta name=\"theme-color\" content=\"#070605\"><title>LAN</title>\n\
@@ -179,14 +179,8 @@ pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
     body.push_str(PAGE_CSS);
     body.push_str(
         "</style></head><body>\n\
-         <main>\n<h1>Addresses</h1>\n\
-         <p class=\"lead\">A device with no address is disabled. Enable it to assign an address.</p>\n\
-         <p class=\"lead\">Updated <time data-ms=\"",
+         <main>\n<h1>Addresses</h1>\n",
     );
-    body.push_str(&updated_at.to_string());
-    body.push_str("\">");
-    body.push_str(&updated_at.to_string());
-    body.push_str("</time>.</p>\n");
     if let Some(error) = error {
         body.push_str("<p class=\"error\">");
         body.push_str(&escape(error));
@@ -294,18 +288,6 @@ pub fn render(updated_at: u64, listed: &[Row], error: Option<&str>) -> String {
              if (ev.key === key && (ev.newValue === \"light\" || ev.newValue === \"dark\")) paint(ev.newValue);\
            });\
          })();\
-         (function () {\
-           var fmt = new Intl.DateTimeFormat(undefined, {\
-             year: \"numeric\", month: \"2-digit\", day: \"2-digit\",\
-             hour: \"2-digit\", minute: \"2-digit\", second: \"2-digit\",\
-             hourCycle: \"h23\", timeZoneName: \"short\"\
-           });\
-           document.querySelectorAll(\"time[data-ms]\").forEach(function (el) {\
-             var ms = Number(el.getAttribute(\"data-ms\"));\
-             if (!Number.isFinite(ms)) return;\
-             el.textContent = fmt.format(new Date(ms));\
-           });\
-         })();\
          </script>\n</body></html>\n",
     );
     body
@@ -343,7 +325,6 @@ h1 { margin: 0 0 0.4rem; font-size: 1.9rem; }
 .person { margin: 1.6rem 0 0.2rem; }
 .person > h2 { margin: 0; font-size: 1.45rem; }
 main { max-width: 56rem; margin: 0 auto; padding: 2rem 1.2rem 3rem; }
-.lead { color: var(--muted); }
 .error { color: var(--bad); font-weight: 600; }
 .card {
   background: var(--bg-elev); border: 1px solid var(--card-line); border-radius: 14px;
@@ -684,6 +665,8 @@ mod tests {
         assert!(html.contains("html[data-theme=\"light\"]"));
         assert!(!html.contains("theme-toggle"));
         assert!(!html.contains("Portal home"));
+        assert!(!html.contains("A device with no address is disabled"));
+        assert!(!html.contains("Updated <time"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
